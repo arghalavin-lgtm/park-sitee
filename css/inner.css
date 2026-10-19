@@ -1,0 +1,89 @@
+/* ===================================================================
+   صفحات داخلی (team.html / projects.html): هدر تیره‌ی سینمایی + ورود نرم
+   همان زبان بصری هیروی صفحه‌ی اول، ولی سبک: یک هدر، یک پرده، چند ورود پله‌ای.
+   رنگ تاکیدی (--acc) را JS روی body می‌گذارد (رنگ همان حوزه در صفحه‌ی اول).
+=================================================================== */
+
+/* ---------- پرده‌ی ورود: از زمینه‌ی تیره‌ی صفحه‌ی اول به محتوای روشن ----------
+   روی html است و فقط با CSS محو می‌شود؛ پس حتی اگر JS خطا بدهد صفحه بسته نمی‌ماند. */
+html::before{
+  content:"";position:fixed;inset:0;z-index:200;pointer-events:none;
+  background:#06111d;
+  animation:veil-out .85s cubic-bezier(.4,0,.2,1) .2s forwards;
+}
+@keyframes veil-out{to{opacity:0;visibility:hidden}}
+
+/* ---------- هدر تیره ---------- */
+html{--acc:#ff8a4c;}  /* پیش‌فرض؛ JS روی body برای هر حوزه بازنویسی می‌کند */
+.page-hero{
+  position:relative;isolation:isolate;overflow:hidden;color:#fff;
+  padding-bottom:58px;
+  border-radius:0 0 34px 34px;
+  background:
+    radial-gradient(70% 130% at 86% -25%, color-mix(in srgb,var(--acc) 30%,transparent) 0%, transparent 62%),
+    radial-gradient(90% 90% at 50% 135%, #0f3550 0%, transparent 62%),
+    #06111d;
+  box-shadow:0 26px 60px -30px rgba(6,17,29,.6);
+}
+/* دانه‌ی فیلم (ساکن) */
+.page-hero::before{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.17;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* خط نوری لبه‌ی پایین، مثل فلر لنز هیرو */
+.page-hero::after{
+  content:"";position:absolute;left:10%;right:10%;bottom:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.75;
+}
+
+.page-hero .team-badge{
+  background:var(--acc);color:#06111d;border:0;letter-spacing:.06em;
+  box-shadow:0 12px 32px -10px color-mix(in srgb,var(--acc) 75%,transparent),inset 0 1px 0 rgba(255,255,255,.4);
+  animation:hero-rise .9s var(--e) .5s both;
+}
+.page-hero .team-title{
+  color:#fff;margin-top:22px;
+  font-size:clamp(30px,4.6vw,56px);letter-spacing:-.03em;line-height:1.2;
+  text-shadow:0 10px 40px rgba(0,0,0,.45);
+  animation:hero-rise 1s var(--e) .62s both;
+}
+.page-hero .team-subtitle{
+  color:rgba(255,255,255,.7);max-width:60ch;line-height:2;
+  animation:hero-rise 1s var(--e) .76s both;
+}
+@keyframes hero-rise{
+  from{opacity:0;transform:translateY(22px);filter:blur(6px)}
+  to{opacity:1;transform:none;filter:none}
+}
+
+/* ---------- دکمه‌های شناور روی هدر تیره (بعد از خروج از هدر، روشن می‌شوند) ---------- */
+body.has-dark-head:not(.hero-past) .nav-fab{
+  background:rgba(8,20,33,.55);color:#fff;
+  border-color:rgba(255,255,255,.16);
+  box-shadow:0 10px 30px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.08);
+}
+body.has-dark-head:not(.hero-past) .nav-fab:hover{background:#fff;color:#06111d;border-color:#fff;}
+
+/* ---------- نوار جستجو: لبه‌ی پایین هدر ---------- */
+.search-dock{position:relative;z-index:30;margin-top:-25px;padding-bottom:6px;}
+.search-dock .site-search{position:relative;top:auto;right:auto;display:inline-block;width:min(100%,420px);}
+.search-dock .site-search__field{
+  box-shadow:0 18px 40px -14px rgba(6,17,29,.45),inset 0 1px 0 rgba(255,255,255,.9);
+  animation:hero-rise .9s var(--e) 1s both;
+}
+.search-dock .site-search input{width:100%;}
+.search-dock .search-results{width:100%;}
+@media (max-width:880px){
+  .search-dock .site-search{left:auto;right:auto;top:auto;width:100%;}
+}
+
+/* ---------- موبایل ---------- */
+@media (max-width:880px){
+  .page-hero{padding-bottom:44px;border-radius:0 0 26px 26px;}
+}
+
+/* ---------- کاهش حرکت ---------- */
+@media (prefers-reduced-motion:reduce){
+  html::before{display:none;}
+  .page-hero .team-badge,.page-hero .team-title,.page-hero .team-subtitle,.search-dock .site-search__field{animation:none;opacity:1;}
+}

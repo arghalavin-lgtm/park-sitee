@@ -1,0 +1,13 @@
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>پنل مدیریت | مرکز گیم و انیمیشن کرمانشاه</title><link rel="stylesheet" href="admin.css"></head><body>
+<div id="login" class="login"><div class="login-card"><div class="logo">پارک علم و فناوری کرمانشاه</div><h1>پنل مدیریت</h1><p>مرکز گیم و انیمیشن کرمانشاه</p><form id="loginForm"><input id="user" autocomplete="username" placeholder="نام کاربری" value="admin" required><input id="pass" autocomplete="current-password" type="password" placeholder="رمز عبور" required><button>ورود به پنل</button><div id="loginErr" class="err"></div></form></div></div>
+<div id="app" class="hidden"><aside><div class="brand"><b>پارک علم و فناوری کرمانشاه</b><span>مدیریت مرکز</span></div><nav><button data-view="dashboard" class="active">داشبورد</button><button data-view="people">افراد و شرکت‌ها</button><button data-view="projects">پروژه‌ها</button><button data-view="teams">حوزه‌ها</button><button data-view="users">حساب اعضا</button><button data-view="site">تنظیمات سایت</button></nav><button id="logout" class="logout">خروج</button></aside><main><header><div><div class="eyebrow">پارک علم و فناوری کرمانشاه</div><h1 id="viewTitle">داشبورد</h1></div><div class="header-tools">
+<button id="globalSearchBtn" class="icon-btn" title="جستجوی سریع">⌕ <span>جستجوی سریع</span><kbd>Ctrl K</kbd></button>
+<button id="refreshBtn" class="icon-btn" title="به‌روزرسانی">↻</button>
+</div></header><section id="content"></section></main></div><div id="commandPalette" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop" data-close="1"></div>
+  <div class="command-card">
+    <div class="command-head"><b>جستجوی سریع</b><button class="btn" data-close="1">×</button></div>
+    <input id="commandInput" class="command-input" placeholder="نام، پروژه یا بخش را جستجو کنید…" autocomplete="off">
+    <div id="commandResults" class="command-results"></div>
+  </div>
+</div><div id="toast" style="position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:99"></div><script src="admin.js"></script></body></html>
