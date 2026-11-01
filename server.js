@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
+const report = require('./report');
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 8000);
@@ -92,7 +93,7 @@ function getSession(req){
   const s=sessions.get(sid);
   if(!s) return null;
   if(Date.now()-s.created>SESSION_TTL_MS){ sessions.delete(sid); return null; }
-  if(s.role !== 'admin'){                                // حساب حذف/غیرفعال شده باشد، سشن بی‌اعتبار است
+  if(s.userId){                                          // حساب حذف/غیرفعال شده باشد (عضو یا مدیرِ اضافه)، سشن بی‌اعتبار است
     const u = db.getUserById(s.userId);
     if(!u || u.disabled){ sessions.delete(sid); return null; }
     s.role = u.role; s.username = u.username;
@@ -126,6 +127,9 @@ function cleanUrl(v){
   if(/^assets\/[A-Za-z0-9_\-./]+$/.test(s) && s.length<=200) return s;
   return '';
 }
+function cleanProjectLink(v){ const u=cleanUrl(v); return /^https?:\/\//i.test(u)?u:''; } // فقط http/https
+const PROJECT_KINDS=['auto','video','game','image','link'];
+function cleanProjectKind(v){ return PROJECT_KINDS.includes(v)?v:'auto'; }
 function cleanNum(v, lo, hi){ if(v===''||v==null) return null; const n=Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : null; }
 
 /* ---------------------------- فایل‌های استاتیک ---------------------------- */
@@ -232,7 +236,7 @@ async function api(req,res){
   if(p==='/api/me'){
     const s=getSession(req);
     if(!s) return send(res,200,{authenticated:false});
-    if(s.role==='admin') return send(res,200,{authenticated:true,role:'admin',username:s.username});
+    if(s.role==='admin') return send(res,200,{authenticated:true,role:'admin',username:s.username,main:!s.userId});
     const u=db.getUserById(s.userId);
     return send(res,200,{authenticated:true,role:u.role,username:u.username,personId:u.personId,mustChange:u.mustChange});
   }
@@ -255,6 +259,18 @@ async function api(req,res){
     const name = crypto.randomBytes(8).toString('hex') + '.' + ext;
     fs.writeFileSync(path.join(UPLOAD_DIR,name), buf);
     return send(res,200,{ok:true,path:'assets/uploads/'+name});
+  }
+
+  /* ----- تغییر رمز «مدیرِ اضافه» (مدیر اصلی رمزش در admin-config.json است) ----- */
+  if(req.method==='POST' && p==='/api/admin/password'){
+    if(sess.role!=='admin' || !sess.userId) return send(res,403,{error:'این بخش مخصوص حساب‌های مدیرِ اضافه است.'});
+    const b=await body(req); const me=db.getUserById(sess.userId);
+    if(!me || !verifyPassword(b.current,me.passHash)) return send(res,400,{error:'رمز فعلی درست نیست.'});
+    const next=String(b.next||'');
+    if(next.length<8) return send(res,400,{error:'رمز جدید باید حداقل ۸ نویسه باشد.'});
+    if(next===String(b.current)) return send(res,400,{error:'رمز جدید باید با رمز فعلی فرق داشته باشد.'});
+    db.updateUser(me.id,{passHash:hashPassword(next),mustChange:false});
+    return send(res,200,{ok:true});
   }
 
   /* ----- پنل اعضا و سرگروه‌ها ----- */
@@ -315,7 +331,7 @@ async function api(req,res){
       const proj={id,personId,title:clean(b.title,120)||'پروژه بدون عنوان',stage,
         progress:cleanNum(b.progress,0,100)??stage*25,
         note:cleanLong(b.note,1000),
-        start:clean(b.start,12), end:clean(b.end,12),
+        start:clean(b.start,12), end:clean(b.end,12), link:cleanProjectLink(b.link), kind:cleanProjectKind(b.kind), image:cleanUrl(b.image),
         history, updatedAt:new Date().toISOString().slice(0,10)};
       const d=cleanNum(b.daysWorked,0,100000), h=cleanNum(b.hoursWorked,0,1000000);
       if(d!==null) proj.daysWorked=d; if(h!==null) proj.hoursWorked=h;
@@ -337,7 +353,7 @@ async function api(req,res){
   /* مدیریت حساب‌ها */
   if(req.method==='GET' && p==='/api/users'){
     const people=db.loadData().people;
-    return send(res,200,{users:db.listUsers().map(u=>({id:u.id,username:u.username,role:u.role,personId:u.personId,
+    return send(res,200,{users:db.listUsers().filter(u=>u.role!=='admin').map(u=>({id:u.id,username:u.username,role:u.role,personId:u.personId,
       personName:people[u.personId]?people[u.personId].name:'(حذف‌شده)',disabled:u.disabled,mustChange:u.mustChange,
       createdAt:u.createdAt,lastLogin:u.lastLogin}))});
   }
@@ -369,7 +385,7 @@ async function api(req,res){
   }
   if(req.method==='PUT' && p.startsWith('/api/users/')){
     const id=Number(p.split('/').pop()); const u=db.getUserById(id);
-    if(!u) return send(res,404,{error:'حساب پیدا نشد.'});
+    if(!u || u.role==='admin') return send(res,404,{error:'حساب پیدا نشد.'});
     const b=await body(req); const f={};
     if(b.role) f.role=b.role==='lead'?'lead':'member';
     if(b.personId!=null){ if(!db.personExists(safeId(b.personId))) return send(res,400,{error:'فرد/شرکت پیدا نشد.'}); f.personId=safeId(b.personId); }
@@ -380,12 +396,50 @@ async function api(req,res){
     return send(res,200,{ok:true,password});
   }
   if(req.method==='DELETE' && p.startsWith('/api/users/')){
-    if(!db.deleteUser(Number(p.split('/').pop()))) return send(res,404,{error:'حساب پیدا نشد.'});
+    const du=db.getUserById(Number(p.split('/').pop()));
+    if(!du || du.role==='admin' || !db.deleteUser(du.id)) return send(res,404,{error:'حساب پیدا نشد.'});
     return send(res,200,{ok:true});
   }
 
+  /* ----- حساب‌های «مدیرِ اضافه» (فقط مدیر اصلی) ----- */
+  if(p==='/api/admins' || p.startsWith('/api/admins/')){
+    if(sess.userId) return send(res,403,{error:'فقط مدیر اصلی می‌تواند حساب مدیر بسازد یا تغییر دهد.'});
+    if(req.method==='GET' && p==='/api/admins')
+      return send(res,200,{admins:db.listUsers().filter(u=>u.role==='admin').map(u=>({id:u.id,username:u.username,disabled:u.disabled,createdAt:u.createdAt,lastLogin:u.lastLogin}))});
+    if(req.method==='POST' && p==='/api/admins'){
+      const b=await body(req);
+      const username=String(b.username||'').trim().toLowerCase();
+      if(!/^[a-z0-9._-]{3,32}$/.test(username)) return send(res,400,{error:'نام کاربری باید ۳ تا ۳۲ نویسه‌ی انگلیسی/عدد باشد.'});
+      if(username===ADMIN.username.toLowerCase() || db.getUserByName(username)) return send(res,400,{error:'این نام کاربری قبلاً استفاده شده است.'});
+      const password=String(b.password||'').length>=8 ? String(b.password) : randomPassword();
+      const id=db.createUser({username,passHash:hashPassword(password),role:'admin',personId:'',mustChange:false});
+      return send(res,200,{ok:true,id,username,password});
+    }
+    const aid=Number(p.split('/').pop()), au=db.getUserById(aid);
+    if(!au || au.role!=='admin') return send(res,404,{error:'حساب مدیر پیدا نشد.'});
+    if(req.method==='PUT'){
+      const b=await body(req); const f={}; let password=null;
+      if(b.disabled!=null) f.disabled=!!b.disabled;
+      if(b.resetPassword){ password=randomPassword(); f.passHash=hashPassword(password); f.mustChange=false; }
+      db.updateUser(aid,f);
+      return send(res,200,{ok:true,password});
+    }
+    if(req.method==='DELETE'){ db.deleteUser(aid); return send(res,200,{ok:true}); }
+  }
+
   /* مدیریت سایت (قبلی) */
-  if(req.method==='GET' && p==='/api/data') return send(res,200,db.loadData());
+  /* گزارش اکسل پروژه‌ها (فقط مدیر): دسته‌بندی، تعداد، جزئیات و بخش مالی */
+  if(req.method==='GET' && p==='/api/report/projects.xlsx'){
+    const data=db.loadData(); const team=String(qs.get('team')||'');
+    if(team && !data.teams[team]) return send(res,400,{error:'حوزه‌ی انتخاب‌شده پیدا نشد.'});
+    const buf=report.buildProjectsReport(data, db.getAllFinance(), {team});
+    const stamp=new Date().toISOString().slice(0,10);
+    res.writeHead(200,{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition':`attachment; filename="park-projects-report-${stamp}.xlsx"`,'Cache-Control':'no-store',...SEC_HEADERS});
+    return res.end(buf);
+  }
+
+  if(req.method==='GET' && p==='/api/data') return send(res,200,{...db.loadData(), finance:db.getAllFinance()});
   if(req.method==='GET' && (p==='/api/backup' || p==='/api/backup.sqlite')){
     const tmp=path.join(require('os').tmpdir(),'park-backup-'+Date.now()+'.sqlite');
     db.backupTo(tmp);
@@ -420,7 +474,11 @@ async function api(req,res){
   if(req.method==='PUT' && p==='/api/projects'){
     const b=await body(req); const id=safeId(b.id); if(!id) return send(res,400,{error:'شناسه الزامی است'});
     if(!db.personExists(b.personId)) return send(res,400,{error:'فرد یا شرکت انتخاب‌شده پیدا نشد'});
-    db.upsertProject({...b,id}); publish();
+    // فیلدهای مالی جدا ذخیره می‌شوند (نه داخل پروژه) تا هرگز وارد js/data.js و سایت عمومی نشوند
+    const {budget,spent,funder,financeNote,...rest}=b;
+    db.upsertProject({...rest,id,link:cleanProjectLink(rest.link),kind:cleanProjectKind(rest.kind),image:cleanUrl(rest.image),updatedAt:new Date().toISOString().slice(0,10)}); publish();
+    if(['budget','spent','funder','financeNote'].some(k=>k in b))
+      db.setFinance(id,{budget:cleanNum(budget,0,1e15),spent:cleanNum(spent,0,1e15),funder:clean(funder,120),note:cleanLong(financeNote,500)});
     return send(res,200,{ok:true,project:db.loadData().projects[id]});
   }
   if(req.method==='DELETE' && p.startsWith('/api/projects/')){

@@ -189,6 +189,17 @@ CREATE TABLE IF NOT EXISTS project_history(
   stage      INTEGER,
   PRIMARY KEY(project_id, position)
 );
+
+-- اطلاعات مالی پروژه‌ها (فقط برای مدیر). عمداً کلید خارجی ندارد تا db:import آن را پاک نکند،
+-- و عمداً داخل loadData() / js/data.js نمی‌آید تا در سایت عمومی منتشر نشود.
+CREATE TABLE IF NOT EXISTS project_finance(
+  project_id TEXT PRIMARY KEY,
+  budget     REAL,
+  spent      REAL,
+  funder     TEXT,
+  note       TEXT,
+  updated_at TEXT
+);
 `);
 
 /* ----------------------------- کمکی‌ها ----------------------------- */
@@ -386,6 +397,7 @@ function upsertPerson(p){
 function deletePerson(id){
   return tx(() => {
     const r = run('DELETE FROM people WHERE id=?', id); // پروژه‌ها، تگ‌ها و نمونه‌کارها با CASCADE پاک می‌شوند
+    run('DELETE FROM project_finance WHERE project_id NOT IN (SELECT id FROM projects)'); // مالیِ پروژه‌های پاک‌شده
     return r.changes > 0;
   });
 }
@@ -425,7 +437,34 @@ function upsertProject(b, opts = {}){
   });
 }
 function deleteProject(id){
-  return tx(() => run('DELETE FROM projects WHERE id=?', id).changes > 0);
+  return tx(() => {
+    run('DELETE FROM project_finance WHERE project_id=?', id);
+    return run('DELETE FROM projects WHERE id=?', id).changes > 0;
+  });
+}
+
+/* ----------------------------- اطلاعات مالی پروژه‌ها (فقط مدیر) ----------------------------- */
+function getAllFinance(){
+  const out = {};
+  all('SELECT project_id, budget, spent, funder, note FROM project_finance').forEach(r => {
+    out[r.project_id] = { budget: r.budget, spent: r.spent, funder: r.funder || '', note: r.note || '' };
+  });
+  return out;
+}
+/* اگر همه‌ی فیلدها خالی باشند ردیف مالی پاک می‌شود */
+function setFinance(projectId, f){
+  const budget = numOrNull(f && f.budget), spent = numOrNull(f && f.spent);
+  const funder = f && f.funder ? String(f.funder) : null, note = f && f.note ? String(f.note) : null;
+  tx(() => {
+    if(budget === null && spent === null && !funder && !note){
+      run('DELETE FROM project_finance WHERE project_id=?', projectId);
+      return;
+    }
+    run(`INSERT INTO project_finance(project_id,budget,spent,funder,note,updated_at) VALUES(?,?,?,?,?,?)
+         ON CONFLICT(project_id) DO UPDATE SET budget=excluded.budget, spent=excluded.spent,
+         funder=excluded.funder, note=excluded.note, updated_at=excluded.updated_at`,
+      projectId, budget, spent, funder, note, new Date().toISOString());
+  });
 }
 
 /* ----------------------------- وارد کردن کل داده (از data.js) ----------------------------- */
@@ -521,7 +560,7 @@ function getUserById(id){ return userRow(get('SELECT * FROM users WHERE id=?', N
 function listUsers(){ return all('SELECT * FROM users ORDER BY id').map(userRow); }
 function createUser(u){
   const r = run('INSERT INTO users(username,pass_hash,role,person_id,must_change,created_at) VALUES(?,?,?,?,?,?)',
-    u.username, u.passHash, u.role === 'lead' ? 'lead' : 'member', String(u.personId), u.mustChange === false ? 0 : 1, new Date().toISOString());
+    u.username, u.passHash, u.role === 'lead' ? 'lead' : (u.role === 'admin' ? 'admin' : 'member'), String(u.personId == null ? '' : u.personId), u.mustChange === false ? 0 : 1, new Date().toISOString());
   return Number(r.lastInsertRowid);
 }
 function updateUser(id, f){
@@ -545,7 +584,7 @@ module.exports = {
   DRIVER, DB_FILE, DATA_JS,
   loadData, setSite, setTeams, setMenu, setStages,
   upsertPerson, deletePerson, personExists, upsertProject, deleteProject,
-  replaceAll, isEmpty,
+  replaceAll, isEmpty, getAllFinance, setFinance,
   getUserByName, getUserById, listUsers, createUser, updateUser, deleteUser, deleteUsersOfPerson, touchLogin,
   getPerson, projectsOfPerson, getProject, initFromDataJsIfEmpty, readDataJs, exportDataJs, backupTo, close, getMeta, setMeta
 };

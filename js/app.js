@@ -1257,6 +1257,80 @@ function renderProjects(){
 /* =========================================================================
    صفحه‌ی پروفایل — بج بنفش «نمونه کارها» + کارت مشخصات + قاب‌ها
 ========================================================================= */
+/* =========================================================================
+   بخش «پروژه‌ها» در پروفایل فرد/شرکت: همه‌ی پروژه‌های ثبت‌شده برای او، به‌صورت کارت
+========================================================================= */
+function projectCategory(pr, stage){
+  const last = Math.max(1, (D.stages || []).length - 1);
+  return (stage >= last || pr >= 100) ? 'done' : (stage >= 2 || pr > 0) ? 'active' : 'planned';
+}
+/* لینک پروژه را به یک «رسانه‌ی قابل نمایش» تبدیل می‌کند: ویدیو، بازی، تصویر یا فقط لینک */
+function projectMedia(link, kind){
+  const u = String(link || '').trim();
+  if(!/^https?:\/\//i.test(u) || kind === 'link') return { type:'link' };
+  if(kind === 'game') return { type:'game', src:u };
+  if(kind === 'image' || ((!kind || kind === 'auto') && /\.(png|jpe?g|gif|webp|avif|svg)(\?.*)?$/i.test(u))) return { type:'image', src:u };
+  let m;
+  if((m = u.match(/aparat\.com\/v\/([A-Za-z0-9]+)/i))) return { type:'embed', src:`https://www.aparat.com/video/video/embed/videohash/${m[1]}/vt/frame` };
+  if((m = u.match(/(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/i))) return { type:'embed', src:`https://www.youtube-nocookie.com/embed/${m[1]}` };
+  if((m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/i))) return { type:'embed', src:`https://player.vimeo.com/video/${m[1]}` };
+  if(/\.(mp4|webm|ogv)(\?.*)?$/i.test(u)) return { type:'file', src:u };
+  if(kind === 'video') return { type:'embed', src:u };            // لینک آماده‌ی embed
+  return { type:'link' };
+}
+function projectMediaHTML(md, title){
+  const IF = 'allow="fullscreen; autoplay; gamepad; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-popups allow-pointer-lock allow-forms"';
+  if(md.type === 'embed') return `<div class="pp-media"><div class="video-embed"><iframe src="${esc(md.src)}" title="${esc(title)}" loading="lazy" ${IF}></iframe></div></div>`;
+  if(md.type === 'file')  return `<div class="pp-media"><video controls preload="metadata" playsinline src="${esc(md.src)}"></video></div>`;
+  if(md.type === 'image') return `<div class="pp-media is-image"><img src="${esc(md.src)}" alt="${esc(title)}" loading="lazy"></div>`;
+  if(md.type === 'game')  return `<div class="pp-media pp-game" data-src="${esc(md.src)}" data-title="${esc(title)}"><button type="button" class="pp-play"><span class="pp-play-ico">▶</span><b>اجرای بازی</b><small>برای شروع کلیک کنید</small></button></div>`;
+  return '';
+}
+
+function buildPersonProjects(p){
+  /* فقط خودِ پروژه نمایش داده می‌شود (ویدیو / بازی / تصویر)، نه اطلاعات آن */
+  const items = Object.values(D.projects || {}).filter(x => x.personId === p.id).map(x => ({ x, md: projectMedia(x.link, x.kind) }))
+    .sort((a, b) => (b.md.type !== 'link' || !!b.x.image) - (a.md.type !== 'link' || !!a.x.image) || a.x.title.localeCompare(b.x.title, 'fa'));
+  const hasLink = x => /^https?:\/\//i.test(x.link || '');
+  const mediaOf = ({ x, md }) => {
+    const title = x.title || 'پروژه';
+    if(md.type === 'game' && x.image) return projectMediaHTML(md, title).replace('class="pp-media pp-game"', `class="pp-media pp-game" style="background-image:linear-gradient(rgba(14,40,65,.45),rgba(14,40,65,.45)),url('${esc(x.image)}');background-size:cover;background-position:center"`);
+    if(md.type !== 'link') return projectMediaHTML(md, title);
+    if(x.image) return hasLink(x)
+      ? `<a class="pp-media is-image" href="${esc(x.link)}" target="_blank" rel="noopener noreferrer"><img src="${esc(x.image)}" alt="${esc(title)}" loading="lazy"></a>`
+      : `<div class="pp-media is-image"><img src="${esc(x.image)}" alt="${esc(title)}" loading="lazy"></div>`;
+    return `<div class="pp-media pp-slot"><span class="slot-icon">${I.frame}</span><b>جای این پروژه خالی است</b><small>پروژه بعداً اینجا قرار می‌گیرد</small></div>`;
+  };
+
+  const sec = ce('section','person-projects');
+  sec.id = 'person-projects';
+  sec.innerHTML = `
+    <div class="pp-head">
+      <h3 class="pp-title">پروژه‌ها</h3>
+      <span class="pp-count">${esc(fa(items.length))} پروژه</span>
+    </div>
+    ${items.length ? `<div class="pp-grid">${items.map(it => `
+      <article class="pp-card">
+        ${mediaOf(it)}
+        <div class="pp-body">
+          <h4 class="pp-name">${esc(it.x.title || 'پروژه بدون عنوان')}</h4>
+          ${it.x.note ? `<p class="pp-note">${esc(it.x.note)}</p>` : ''}
+          ${hasLink(it.x) && (it.md.type !== 'link' || !it.x.image) ? `<a class="pp-open${it.md.type !== 'link' ? ' is-ghost' : ''}" href="${esc(it.x.link)}" target="_blank" rel="noopener noreferrer">${it.md.type === 'link' ? 'مشاهده پروژه' : 'باز کردن در صفحه‌ی جدید'} <span aria-hidden="true">↗</span></a>` : ''}
+        </div>
+      </article>`).join('')}</div>`
+    : '<div class="pp-empty">هنوز پروژه‌ای برای این پروفایل ثبت نشده است.</div>'}`;
+  settle(sec);
+  /* بازی: با کلیک اجرا می‌شود (تا صفحه سنگین نشود) */
+  qsa('.pp-game', sec).forEach(box => {
+    const btn = qs('.pp-play', box);
+    btn.addEventListener('click', () => {
+      box.classList.add('is-live'); box.style.backgroundImage = 'none';
+      box.innerHTML = `<div class="video-embed"><iframe src="${esc(box.dataset.src)}" title="${esc(box.dataset.title)}" allow="fullscreen; autoplay; gamepad; pointer-lock" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-popups allow-pointer-lock allow-forms"></iframe></div>`;
+    });
+  });
+  return sec;
+}
+
 function renderProfile(){
   const id = param('id');
   const p = D.people[id];
@@ -1332,6 +1406,9 @@ function renderProfile(){
   layout.appendChild(area);
 
   c.appendChild(layout);
+
+  /* بخش پروژه‌های همین فرد/شرکت */
+  c.appendChild(buildPersonProjects(p));
 
   /* زیر نمونه‌کارها: فقط ردیف و اطلاعات پروژه‌ی خودِ همین فرد/شرکت */
   if(D.projects['proj_' + p.id] && team.members && team.members.includes(p.id)){

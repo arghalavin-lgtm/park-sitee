@@ -113,12 +113,15 @@
 }
 .cine-brand a{
   pointer-events:auto;display:flex;align-items:center;gap:12px;
-  padding:8px 20px 8px 12px;border-radius:20px;
+  padding:7px 16px 7px 8px;border-radius:16px;
   background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
 }
-.cine-brand .bm{width:54px;height:54px;display:grid;place-items:center;flex:none}
-.cine-brand .bm img{display:block;width:100%;height:100%;object-fit:contain;opacity:.96;filter:drop-shadow(0 4px 16px rgba(0,0,0,.45))}
+.cine-brand .bm{
+  width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  font-size:10.5px;font-weight:900;letter-spacing:.04em;color:#fff;line-height:1.2;text-align:center;
+  background:linear-gradient(145deg,#ff9b5b,#d85b22);box-shadow:0 8px 22px rgba(233,113,50,.35);
+}
 .cine-brand b{display:block;font-size:12.5px;font-weight:800}
 .cine-brand small{display:block;font-size:9px;letter-spacing:.2em;color:rgba(255,255,255,.55);margin-top:1px;direction:ltr;text-align:right}
 
@@ -248,7 +251,6 @@
 .cine-intro::before,.cine-intro::after{content:"";position:absolute;left:0;right:0;height:50%;background:#02060c;transition:transform 1.15s cubic-bezier(.76,0,.24,1)}
 .cine-intro::before{top:0;transform-origin:50% 0}.cine-intro::after{bottom:0;transform-origin:50% 100%}
 .intro-in{position:relative;z-index:1;text-align:center;transition:opacity .5s,transform .8s}
-.intro-logo{display:block;width:clamp(64px,10vmin,92px);height:auto;margin:0 auto 22px;opacity:.95}
 .intro-count{font:800 clamp(54px,9vw,120px)/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:-.04em;color:#fff}
 .intro-count sup{font-size:.28em;letter-spacing:.1em;color:var(--acc);vertical-align:top;margin-left:6px}
 .intro-line{width:min(280px,60vw);height:2px;background:rgba(255,255,255,.14);margin:20px auto 16px;overflow:hidden;border-radius:2px}
@@ -283,8 +285,7 @@ body#page-home .bottom-bar{display:none}
   .outro-stats div:nth-child(n+3){border-top:1px solid rgba(255,255,255,.09)}
   .outro-stats div{padding:18px 10px}
   .cine-brand{top:calc(var(--bar,3vh) + 10px)}
-  .cine-brand a{padding:6px 14px 6px 8px}
-  .cine-brand .bm{width:44px;height:44px}
+  .cine-brand a{padding:5px 12px 5px 6px}
   .cine-brand small{display:none}
   .cine-hud{grid-template-columns:1fr;padding:0 20px;gap:6px;bottom:calc(var(--bar,3vh) + 12px)}
   .hud-tc,.hud-end{display:none}

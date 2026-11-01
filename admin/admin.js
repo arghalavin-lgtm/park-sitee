@@ -1,4 +1,4 @@
-let DATA=null,currentView='dashboard',editing=null;
+let DATA=null,ME=null,currentView='dashboard',editing=null;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
 async function api(url,opt={}){const r=await fetch(url,{headers:{'Content-Type':'application/json',...(opt.headers||{})},...opt});let x={};try{x=await r.json()}catch{}if(!r.ok)throw Error(x.error||'خطا');return x}
@@ -8,7 +8,8 @@ async function boot(){
     const me=await api('/api/me');
     if(!me.authenticated)return;
     if(me.role!=='admin'){$('#loginErr').textContent='این صفحه مخصوص مدیر است. اعضا باید از آدرس /panel/ وارد شوند.';return}
-    await refresh();
+    ME=me; await refresh();
+    if(me.main)$('#adminsNav')?.classList.remove('hidden');
     $('#login').classList.add('hidden');
     $('#app').classList.remove('hidden');
     show('dashboard');
@@ -31,7 +32,7 @@ $('#loginForm').onsubmit=async e=>{
 }
 $('#logout').onclick=async()=>{await api('/api/logout',{method:'POST'});location.reload()};
 $$('nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
-function show(v){currentView=v;editing=null;$$('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));const titles={dashboard:'داشبورد',people:'افراد و شرکت‌ها',projects:'پروژه‌ها',teams:'حوزه‌ها',users:'حساب اعضا',site:'تنظیمات سایت'};$('#viewTitle').textContent=titles[v];({dashboard:dashboard,people:people,projects:projects,teams:teams,users:users,site:site}[v])()}
+function show(v){currentView=v;editing=null;$$('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));const titles={dashboard:'داشبورد',people:'افراد و شرکت‌ها',projects:'پروژه‌ها',reports:'گزارش‌ها',admins:'مدیران',teams:'حوزه‌ها',users:'حساب اعضا',site:'تنظیمات سایت'};$('#viewTitle').textContent=titles[v];({dashboard:dashboard,people:people,projects:projects,reports:reports,admins:admins,teams:teams,users:users,site:site}[v])()}
 function dashboard(){
   const ps=Object.values(DATA.people||{}), prs=Object.values(DATA.projects||{});
   const done=prs.filter(p=>Number(p.progress??(Number(p.stage||0)*25))>=100).length;
@@ -51,6 +52,8 @@ function dashboard(){
         <button class="quick-action" onclick="editPerson()"><b>＋ افزودن فرد / شرکت</b><small>ساخت پروفایل جدید</small></button>
         <button class="quick-action" onclick="editProject()"><b>＋ افزودن پروژه</b><small>ثبت پروژه و درصد پیشرفت</small></button>
         <button class="quick-action" onclick="show('teams')"><b>◈ مدیریت حوزه‌ها</b><small>ویرایش عنوان و توضیحات</small></button>
+        ${ME&&!ME.main?'<button class="quick-action" onclick="changeMyPassword()"><b>🔑 تغییر رمز من</b><small>رمز حساب مدیر خودتان</small></button>':''}
+        <button class="quick-action" onclick="show('reports')"><b>▤ گزارش اکسل پروژه‌ها</b><small>دسته‌بندی، تعداد، جزئیات و مالی</small></button>
         <button class="quick-action" onclick="downloadBackup()"><b>↓ پشتیبان‌گیری</b><small>دریافت نسخه JSON اطلاعات</small></button>
       </div>
     </div>
@@ -84,7 +87,7 @@ function projectCard(p){
   return `<div class="project-card" data-search="${(q.name+' '+p.title+' '+p.id).toLowerCase()}" data-team="${q.team||''}" data-stage="${Number(p.stage||0)}">
     <div class="project-top"><div><b>${q.name||p.personId}</b><div class="muted">${p.title||''}</div></div><span class="badge">${DATA.stages[p.stage]||''}</span></div>
     <div style="display:grid;grid-template-columns:1fr 90px;gap:12px;align-items:center;margin-top:12px"><div class="bar"><i style="width:${pct}%"></i></div><b>${fa(pct)}٪</b></div>
-    <div class="project-meta"><span>شروع: <b>${p.start||'—'}</b></span><span>پایان: <b>${p.end||'—'}</b></span><span>روز کاری: <b>${p.daysWorked??'—'}</b></span><span>ساعت: <b>${p.hoursWorked??'—'}</b></span></div>
+    <div class="project-meta"><span>شروع: <b>${p.start||'—'}</b></span><span>پایان: <b>${p.end||'—'}</b></span><span>روز کاری: <b>${p.daysWorked??'—'}</b></span><span>ساعت: <b>${p.hoursWorked??'—'}</b></span>${finLine(p.id)}</div>
     ${p.note?`<div class="muted" style="margin-top:8px">${p.note}</div>`:''}
     <div class="actions" style="margin-top:12px"><button class="btn" onclick="editProject('${p.id}')">ویرایش</button><button class="btn danger" onclick="delProject('${p.id}')">حذف</button></div>
   </div>`;
@@ -95,7 +98,7 @@ function filterProjects(){
 }
 function editProject(id){
   const p=id?DATA.projects[id]:{id:'',personId:Object.keys(DATA.people)[0]||'',title:'پروژه جدید',stage:0,progress:0,history:[],start:'',end:'',daysWorked:'',hoursWorked:'',note:''};
-  const pct=projectProgress(p);
+  const pct=projectProgress(p), fin=(DATA.finance||{})[p.id]||{};
   $('#content').innerHTML=`<div class="panel"><div class="panel-head"><h2>${id?'ویرایش پروژه':'پروژه جدید'}</h2><button class="btn" onclick="show('projects')">بازگشت</button></div>
   <form id="projectForm"><div class="form-grid">
   <div class="field"><label>شناسه</label><input name="id" value="${p.id}" required ${id?'readonly':''}></div>
@@ -107,6 +110,17 @@ function editProject(id){
   <div class="field"><label>تاریخ پایان</label><input name="end" value="${p.end||''}" placeholder="1405/06/30"></div>
   <div class="field"><label>روزهای کارکرد</label><input name="daysWorked" type="number" min="0" value="${p.daysWorked??''}"></div>
   <div class="field"><label>ساعت‌های کارکرد</label><input name="hoursWorked" type="number" min="0" value="${p.hoursWorked??''}"></div>
+  <div class="field full" style="border-top:1px solid #e3e9ee;padding-top:14px"><b>اطلاعات مالی (فقط برای مدیر؛ در سایت عمومی نمایش داده نمی‌شود)</b></div>
+  <div class="field"><label>بودجه پروژه (${CUR})</label><input name="budget" type="number" min="0" step="any" value="${fin.budget??''}"></div>
+  <div class="field"><label>هزینه‌شده تا امروز (${CUR})</label><input name="spent" type="number" min="0" step="any" value="${fin.spent??''}"></div>
+  <div class="field"><label>منبع تأمین مالی</label><input name="funder" value="${escA(fin.funder||'')}"></div>
+  <div class="field full"><label>توضیحات مالی</label><textarea name="financeNote" rows="2">${escA(fin.note||'')}</textarea></div>
+  <div class="field"><label>نوع نمایش پروژه در پروفایل</label><select name="kind">${[['auto','خودکار'],['video','ویدیو / انیمیشن'],['game','بازی (قابل اجرا در صفحه)'],['image','تصویر'],['link','فقط دکمه‌ی لینک']].map(([k,t])=>`<option value="${k}" ${(p.kind||'auto')===k?'selected':''}>${t}</option>`).join('')}</select></div>
+  <div class="field"><label>لینک پروژه</label><input name="link" type="url" dir="ltr" maxlength="500" placeholder="https://..." value="${escA(p.link||'')}"></div>
+  <div class="field full"><small style="color:#6b7785">اختیاری. ویدیو: لینک آپارات، یوتیوب، ویمیو یا فایل mp4. بازی: لینک اجرای بازی (مثلاً آدرس embed در itch.io یا نسخه WebGL). پروژه همان‌جا در پروفایل فرد نمایش داده می‌شود.</small></div>
+  <div class="field full"><label>تصویر پروژه (پوستر یا اسکرین‌شات؛ روی خود پروژه در پروفایل نمایش داده می‌شود)</label>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><img id="projImgPrev" alt="" src="${escA(p.image?'/'+String(p.image).replace(/^\/+/,''):'')}" style="width:160px;height:90px;object-fit:cover;border-radius:10px;border:1px solid #dde4ea;display:${p.image?'block':'none'}">
+    <input type="hidden" name="image" value="${escA(p.image||'')}"><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="uploadProjectImage(this)"><button type="button" class="btn danger" onclick="clearProjectImage()">حذف تصویر</button></div></div>
   <div class="field full"><label>توضیحات پروژه</label><textarea name="note" placeholder="توضیح کوتاه درباره وضعیت فعلی پروژه…">${p.note||''}</textarea></div>
   <div class="field full"><label>تاریخچه پیشرفت (JSON اختیاری)</label><textarea name="history">${JSON.stringify(p.history||[],null,2)}</textarea></div>
   </div><div class="form-actions"><button class="primary">ذخیره</button><button type="button" class="btn secondary" onclick="show('projects')">انصراف</button></div></form></div>`;
@@ -123,13 +137,91 @@ async function saveProject(e){
 }
 async function delProject(id){if(!confirm('پروژه حذف شود؟'))return;await api('/api/projects/'+id,{method:'DELETE'});await refresh();show('projects');toast('حذف شد')}
 function teams(){const ts=Object.values(DATA.teams);$('#content').innerHTML=`<div class="panel"><div class="panel-head"><h2>حوزه‌های سایت</h2><button class="primary" onclick="saveTeams()">ذخیره همه</button></div>${ts.map(t=>`<div class="project-card"><div class="form-grid"><div class="field"><label>عنوان فارسی</label><input class="team-fa" data-id="${t.id}" value="${t.titleFa||''}"></div><div class="field"><label>عنوان انگلیسی</label><input class="team-en" data-id="${t.id}" value="${t.title||''}"></div><div class="field full"><label>زیرعنوان</label><input class="team-sub" data-id="${t.id}" value="${t.subtitle||''}"></div><div class="field full"><label>ابزارهای این حوزه (هر خط یک گروه، به شکل «نام گروه: ابزار۱، ابزار۲»)</label><textarea class="team-tools" data-id="${t.id}" rows="5" placeholder="موتور بازی: Godot، Unity">${escA((t.tools||[]).map(g=>g.group+': '+(g.items||[]).join('، ')).join('\n'))}</textarea></div><div class="field full"><label>آمار این حوزه (هر خط یک مورد، به شکل «عنوان: مقدار»)</label><textarea class="team-stats" data-id="${t.id}" rows="5" placeholder="تعداد تیم‌ها: ۷">${escA((t.stats||[]).map(x=>x.label+': '+x.value).join('\n'))}</textarea></div></div></div>`).join('')}</div>`}
-function escA(x){return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function escA(x){return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function parseToolLines(txt){return String(txt||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.search(/[:：]/);const g=i<0?'ابزارها':l.slice(0,i).trim();const rest=i<0?l:l.slice(i+1);return{group:g||'ابزارها',items:rest.split(/[,،]/).map(x=>x.trim()).filter(Boolean)}}).filter(g=>g.items.length)}
 function parseStatLines(txt){return String(txt||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.search(/[:：]/);return i<0?{label:l,value:''}:{label:l.slice(0,i).trim(),value:l.slice(i+1).trim()}})}
 async function saveTeams(){const teams=structuredClone(DATA.teams);Object.values(teams).forEach(t=>{t.titleFa=$('.team-fa[data-id="'+t.id+'"]')?.value||t.titleFa;t.title=$('.team-en[data-id="'+t.id+'"]')?.value||t.title;t.subtitle=$('.team-sub[data-id="'+t.id+'"]')?.value||t.subtitle;const tt=$('.team-tools[data-id="'+t.id+'"]');if(tt)t.tools=parseToolLines(tt.value);const ss=$('.team-stats[data-id="'+t.id+'"]');if(ss)t.stats=parseStatLines(ss.value)});await api('/api/teams',{method:'PUT',body:JSON.stringify({teams})});await refresh();toast('حوزه‌ها ذخیره شدند')}
 function site(){const s=DATA.site;$('#content').innerHTML=`<div class="panel"><div class="panel-head"><h2>متن‌های سایت</h2><button class="primary" onclick="saveSite()">ذخیره</button></div><form id="siteForm"><div class="form-grid">${[['name','نام مرکز'],['nameLatin','نام لاتین'],['title','عنوان'],['headline','تیتر'],['lead','متن معرفی'],['aboutTitle','عنوان درباره'],['aboutText','متن درباره'],['toolsTitle','عنوان ابزارها'],['toolsText','متن ابزارها'],['footText','متن فوتر']].map(([k,l])=>`<div class="field ${['lead','aboutText','toolsText','footText'].includes(k)?'full':''}"><label>${l}</label><textarea name="${k}">${s[k]||''}</textarea></div>`).join('')}</div></form></div>${momPanel()}`}
 async function saveSite(){const f=new FormData($('#siteForm')),s=Object.fromEntries(f.entries());s.tools=DATA.site.tools||[];s.memberOfMonth=readMOM();await api('/api/site',{method:'PUT',body:JSON.stringify(s)});await refresh();toast('تنظیمات ذخیره شد')}
 boot();
+
+/* === حساب‌های مدیرِ اضافه (فقط مدیر اصلی) === */
+async function admins(){
+  $('#content').innerHTML='<div class="panel"><div class="muted">در حال بارگذاری…</div></div>';
+  let list;try{list=(await api('/api/admins')).admins}catch(e){$('#content').innerHTML='<div class="notice">'+eh(e.message)+'</div>';return}
+  $('#content').innerHTML=`<div class="panel"><div class="panel-head"><h2>حساب‌های مدیر</h2></div>
+    <div class="notice">مدیرِ اضافه از همین آدرس (<b dir="ltr">${eh(location.origin+'/admin/')}</b>) با نام کاربری و رمز خودش وارد می‌شود و به همه‌ی بخش‌های پنل دسترسی دارد، جز ساخت و تغییر حساب مدیرها. رمز فقط همان لحظه‌ی ساخت یا بازنشانی نمایش داده می‌شود.</div>
+    <form class="form-grid" style="margin-top:16px" onsubmit="createAdminSubmit(event)">
+      <div class="field"><label>نام کاربری (انگلیسی)</label><input name="username" dir="ltr" pattern="[A-Za-z0-9._-]{3,32}" required placeholder="مثلاً manager2"></div>
+      <div class="field"><label>رمز (خالی = ساخت خودکار)</label><input name="password" dir="ltr" minlength="8" placeholder="حداقل ۸ نویسه"></div>
+      <div class="form-actions"><button class="primary">ساخت حساب مدیر</button></div></form><div id="credBox"></div></div>
+    <div class="panel"><div class="panel-head"><h2>مدیرهای اضافه (${fa(list.length)})</h2></div>
+    <div class="table-wrap"><table class="table"><thead><tr><th>نام کاربری</th><th>آخرین ورود</th><th>وضعیت</th><th></th></tr></thead><tbody>${list.map(u=>`<tr>
+      <td dir="ltr" style="text-align:right">${eh(u.username)}</td><td>${fdate(u.lastLogin)}</td>
+      <td>${u.disabled?'<span class="badge" style="background:#fdecec;color:#c33">غیرفعال</span>':'<span class="badge" style="background:#e8f7f0;color:#1f9d6b">فعال</span>'}</td>
+      <td><div class="actions"><button class="btn" onclick="resetAdminPw(${u.id})">رمز جدید</button><button class="btn" onclick="toggleAdmin(${u.id},${!u.disabled})">${u.disabled?'فعال‌سازی':'غیرفعال'}</button><button class="btn danger" onclick="delAdmin(${u.id})">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="4" class="empty">هنوز مدیر دیگری ساخته نشده است.</td></tr>'}</tbody></table></div></div>`;
+}
+async function createAdminSubmit(e){e.preventDefault();const b=Object.fromEntries(new FormData(e.target).entries());
+  try{const r=await api('/api/admins',{method:'POST',body:JSON.stringify(b)});await admins();showCreds([{name:'مدیر',username:r.username,password:r.password}])}catch(x){alert(x.message)}}
+async function resetAdminPw(id){if(!confirm('رمز جدید ساخته شود؟ رمز قبلی از کار می‌افتد.'))return;
+  try{const r=await api('/api/admins/'+id,{method:'PUT',body:JSON.stringify({resetPassword:true})});const l=(await api('/api/admins')).admins.find(x=>x.id===id);await admins();showCreds([{name:'مدیر',username:l?l.username:'',password:r.password}])}catch(x){alert(x.message)}}
+async function toggleAdmin(id,disabled){try{await api('/api/admins/'+id,{method:'PUT',body:JSON.stringify({disabled})});await admins();toast(disabled?'حساب غیرفعال شد':'حساب فعال شد')}catch(x){alert(x.message)}}
+async function delAdmin(id){if(!confirm('این حساب مدیر حذف شود؟'))return;try{await api('/api/admins/'+id,{method:'DELETE'});await admins();toast('حساب حذف شد')}catch(x){alert(x.message)}}
+async function changeMyPassword(){
+  const current=prompt('رمز فعلی:');if(!current)return;const next=prompt('رمز جدید (حداقل ۸ نویسه):');if(!next)return;
+  try{await api('/api/admin/password',{method:'POST',body:JSON.stringify({current,next})});toast('رمز تغییر کرد')}catch(x){alert(x.message)}
+}
+
+/* === تصویر پروژه === */
+function setProjectImage(path){const h=document.querySelector('#projectForm [name=image]'),pv=$('#projImgPrev');h.value=path||'';pv.style.display=path?'block':'none';if(path)pv.src='/'+String(path).replace(/^\/+/,'')}
+function clearProjectImage(){setProjectImage('')}
+async function uploadProjectImage(inp){
+  const f=inp.files[0];if(!f)return;
+  if(f.size>4*1024*1024){inp.value='';return alert('حجم عکس باید کمتر از ۴ مگابایت باشد.')}
+  try{const r=await fetch('/api/upload',{method:'POST',headers:{'Content-Type':f.type,'X-Requested-With':'park'},body:f});
+    const x=await r.json().catch(()=>({}));if(!r.ok)throw Error(x.error||'آپلود انجام نشد.');setProjectImage(x.path);toast('تصویر آپلود شد')}
+  catch(e){alert(e.message)}
+}
+
+/* === گزارش اکسل پروژه‌ها (مدیر) === */
+const CUR='تومان'; // اگر واحد پول را عوض می‌کنید، CURRENCY در report.js را هم عوض کنید
+const money=n=>Number(n||0).toLocaleString('fa-IR');
+function finLine(id){const f=(DATA.finance||{})[id];return f&&(f.budget!=null||f.spent!=null)?`<span>بودجه: <b>${money(f.budget)}</b></span><span>هزینه: <b>${money(f.spent)}</b></span>`:''}
+function reportCat(p){ // همان قاعده‌ی report.js
+  const last=Math.max(1,(DATA.stages||[]).length-1),pr=projectProgress(p),st=Number(p.stage||0);
+  return (st>=last||pr>=100)?'done':(st>=2||pr>0)?'active':'planned';
+}
+function reports(){
+  $('#content').innerHTML=`<div class="panel"><div class="panel-head"><h2>گزارش پروژه‌ها (اکسل)</h2></div>
+    <p class="muted" style="margin:0 0 14px">فایل اکسل شامل شیت‌های «نمای کلی»، «در دست انجام»، «برنامه‌ریزی شده»، «اتمام شده» و «مالی» است؛ هر پروژه با حوزه/تیم، مسئول، تاریخ شروع و پایان، مرحله، پیشرفت و اطلاعات مالی.</p>
+    <div class="form-grid"><div class="field"><label>حوزه</label><select id="reportTeam" onchange="reportPreview()"><option value="">همه حوزه‌ها</option>${Object.values(DATA.teams||{}).map(t=>`<option value="${t.id}">${t.titleFa}</option>`).join('')}</select></div></div>
+    <div id="reportPreview" class="dashboard-grid" style="margin-top:16px"></div>
+    <div class="form-actions"><button class="primary" id="reportBtn" onclick="downloadReport()">↓ دریافت گزارش اکسل</button></div></div>`;
+  reportPreview();
+}
+function reportPreview(){
+  const team=$('#reportTeam')?.value||'';
+  const prs=Object.values(DATA.projects||{}).filter(p=>!team||(DATA.people[p.personId]||{}).team===team);
+  const n=k=>prs.filter(p=>reportCat(p)===k).length, fin=(DATA.finance||{});
+  const b=prs.reduce((a,p)=>a+(Number((fin[p.id]||{}).budget)||0),0), s=prs.reduce((a,p)=>a+(Number((fin[p.id]||{}).spent)||0),0);
+  $('#reportPreview').innerHTML=`
+    <div class="stat"><small>در دست انجام</small><strong>${fa(n('active'))}</strong><div class="stat-meta">پروژه</div></div>
+    <div class="stat"><small>برنامه‌ریزی شده</small><strong>${fa(n('planned'))}</strong><div class="stat-meta">پروژه</div></div>
+    <div class="stat"><small>اتمام شده</small><strong>${fa(n('done'))}</strong><div class="stat-meta">پروژه</div></div>
+    <div class="stat"><small>بودجه / هزینه‌شده</small><strong style="font-size:18px">${money(b)}</strong><div class="stat-meta">هزینه‌شده: ${money(s)} ${CUR}</div></div>`;
+}
+async function downloadReport(){
+  const btn=$('#reportBtn'),team=$('#reportTeam')?.value||'';
+  btn.disabled=true;
+  try{
+    const r=await fetch('/api/report/projects.xlsx'+(team?'?team='+encodeURIComponent(team):''),{credentials:'same-origin'});
+    if(!r.ok){let m='ساخت گزارش ناموفق بود';try{m=(await r.json()).error||m}catch{}throw Error(m)}
+    const blob=await r.blob(),cd=r.headers.get('Content-Disposition')||'',name=(cd.match(/filename="([^"]+)"/)||[])[1]||'projects-report.xlsx';
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast('گزارش اکسل دانلود شد');
+  }catch(x){alert(x.message==='Failed to fetch'?'سرور پنل در دسترس نیست.':x.message)}
+  finally{btn.disabled=false}
+}
 
 /* === Professional utilities === */
 function downloadBackup(){

@@ -105,13 +105,13 @@ const Cinema = (() => {
 
       <header class="cine-brand">
         <a href="index.html" aria-label="صفحه اصلی">
-          <span class="bm"><img src="assets/img/logo-park-mark.png" alt="لوگوی پارک علم و فناوری کرمانشاه" width="64" height="64"></span>
+          <span class="bm">پارک<br>علم</span>
           <span><b>${esc(D.site.name)}</b><small>${esc(D.site.nameLatin || '')}</small></span>
         </a>
       </header>
 
       <div class="cine-title">
-        <div class="cine-kicker"><i></i>${esc(D.site.nameLatin || 'پارک علم و فناوری کرمانشاه')}<i></i></div>
+        <div class="cine-kicker"><i></i>${esc(D.site.nameLatin || 'پارک علم و فناوری')}<i></i></div>
         <h1>${words.map((w, i) => `<span class="w"><span style="--wi:${i}">${esc(w)}</span></span>`).join(' ')}</h1>
         <p class="cine-lead">${esc(D.site.lead || '')}</p>
       </div>
@@ -150,7 +150,6 @@ const Cinema = (() => {
       <div class="cine-bars" aria-hidden="true"><i></i><i></i></div>
       <div class="cine-intro" aria-hidden="true">
         <div class="intro-in">
-          <img class="intro-logo" src="assets/img/logo-park-mark.png" alt="" width="84" height="84">
           <div class="intro-count"><span class="ic">000</span><sup>%</sup></div>
           <div class="intro-line"><i></i></div>
           <div class="intro-tag">PARK · GAME &amp; ANIMATION CENTER</div>

@@ -244,9 +244,21 @@ function openProj(id) {
       <label>تاریخ پایان<input name="end" dir="ltr" placeholder="1405/06/30" maxlength="12" value="${esc(p.end || '')}"></label>
       <label>روزهای کارکرد<input name="daysWorked" type="number" min="0" value="${esc(p.daysWorked ?? '')}"></label>
       <label>ساعت‌های کارکرد<input name="hoursWorked" type="number" min="0" value="${esc(p.hoursWorked ?? '')}"></label>
+      <label>نوع نمایش پروژه در پروفایل<select name="kind">${[['auto','خودکار'],['video','ویدیو / انیمیشن'],['game','بازی (قابل اجرا در صفحه)'],['image','تصویر'],['link','فقط دکمه‌ی لینک']].map(([k, t]) => `<option value="${k}" ${(p.kind || 'auto') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label>لینک پروژه<input name="link" type="url" dir="ltr" maxlength="500" placeholder="https://..." value="${esc(p.link || '')}"></label>
+      <small class="full" style="color:#70808f;line-height:1.9">اختیاری. ویدیو: لینک آپارات، یوتیوب، ویمیو یا فایل mp4. بازی: لینک اجرای بازی (مثلاً آدرس embed بازی در itch.io یا نسخه WebGL). پروژه همان‌جا در پروفایل شما نمایش داده می‌شود.</small>
+      <div class="full"><label style="margin-bottom:8px">تصویر پروژه (پوستر یا اسکرین‌شات)</label>
+        <div class="photo-row"><img id="projImgPrev" alt="" style="width:160px;height:90px;border-radius:12px"><input type="hidden" name="image" value="${esc(p.image || '')}">
+          <div class="btns"><button type="button" class="btn" id="projUp">آپلود تصویر</button><button type="button" class="btn danger" id="projImgDel">حذف تصویر</button></div></div>
+        <small style="color:#70808f">JPG، PNG، WebP یا GIF تا ۴ مگابایت. این تصویر روی خود پروژه در پروفایل نمایش داده می‌شود.</small></div>
       <label class="full">توضیح کوتاه<textarea name="note" maxlength="1000" placeholder="الان روی چه کاری هستید؟">${esc(p.note || '')}</textarea></label></div>
     <div id="projErr" class="err" role="alert"></div>
     <div class="dlg-acts"><button type="submit" class="primary">ذخیره‌ی پروژه</button><button type="button" class="btn" id="projCancel">انصراف</button></div>`;
+  const hid = $('#projForm [name=image]'), prev = $('#projImgPrev');
+  const syncImg = () => { prev.style.display = hid.value ? 'block' : 'none'; if (hid.value) prev.src = img(hid.value); };
+  syncImg();
+  $('#projUp').onclick = () => pickImage(path => { hid.value = path; syncImg(); });
+  $('#projImgDel').onclick = () => { hid.value = ''; syncImg(); };
   const r = $('#pr'), n = $('#pn');
   r.oninput = () => n.value = r.value;
   n.oninput = () => { n.value = Math.max(0, Math.min(100, Number(n.value) || 0)); r.value = n.value; };
@@ -255,7 +267,7 @@ function openProj(id) {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target).entries());
     const body = { id: old ? old.id : undefined, personId: S.person.id, title: f.title, stage: Number(f.stage), progress: Number(f.progress),
-      start: f.start, end: f.end, note: f.note, daysWorked: f.daysWorked, hoursWorked: f.hoursWorked };
+      start: f.start, end: f.end, link: f.link, kind: f.kind, image: f.image, note: f.note, daysWorked: f.daysWorked, hoursWorked: f.hoursWorked };
     try {
       await api('/api/panel/project', { method: 'PUT', body: JSON.stringify(body) });
       $('#projDlg').close(); toast('پروژه ذخیره شد'); await load(S.person.id);
