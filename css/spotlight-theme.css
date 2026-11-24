@@ -1,0 +1,19 @@
+/* ===================================================================
+   رنگ بخش «کاربر برتر ماه»: بنفش تیره‌ی شرابی (از بنفش برند سایت)
+   این فایل بعد از style.css بارگذاری می‌شود و فقط رنگ‌ها را عوض می‌کند.
+   برای برگرداندن به رنگ قبلی، خط لینک این فایل را از index.html پاک کنید.
+=================================================================== */
+.spot{
+  background:
+    radial-gradient(900px 420px at 85% -10%,rgba(233,113,50,.18),transparent 60%),
+    radial-gradient(700px 380px at 0% 115%,rgba(160,43,147,.34),transparent 60%),
+    linear-gradient(145deg,#1b0d29,#2e1545 60%,#210f33);
+  border:1px solid rgba(255,255,255,.09);
+}
+.spot__orb--a{background:rgba(233,113,50,.22)}
+.spot__orb--b{background:rgba(160,43,147,.36)}
+.spot__ring img{border-color:#2e1545;background:#3a1b55}
+.spot__crown{box-shadow:0 10px 24px -6px rgba(233,113,50,.7),0 0 0 4px #2e1545}
+.spot__headline{color:#d9cfe6}
+.spot__project-head,.spot__project-title small,.spot__meta{color:#b6a7c9}
+.spot__reasons li{color:#ebe4f3}

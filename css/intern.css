@@ -1,0 +1,44 @@
+/* ===================================================================
+   حوزه‌ی کارآموز — هم‌سبک بقیه‌ی حوزه‌ها (گیم، انیمیشن، سینما)
+   همان بج، کارت آمار و کارت‌های اعضا؛ فقط با دسته‌بندی مرتب بر اساس حوزه
+=================================================================== */
+.intern-sections{flex:1 1 540px;min-width:0;display:flex;flex-direction:column;gap:34px;}
+
+/* تب‌های حوزه */
+.intern-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0;}
+.intern-nav a{
+  display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;
+  font-size:12.5px;font-weight:700;color:var(--ink-2);background:#fff;
+  border:1px solid rgba(14,40,65,.09);box-shadow:var(--sh-1);
+  transition:background .25s,color .25s,border-color .25s,transform .25s var(--e);
+}
+.intern-nav a::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ac);}
+.intern-nav a b{
+  font-size:11px;min-width:20px;height:20px;padding:0 6px;border-radius:999px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--ac) 14%,transparent);color:var(--ac);transition:background .25s,color .25s;
+}
+.intern-nav a:hover{background:var(--ac);color:#fff;border-color:var(--ac);transform:translateY(-2px);}
+.intern-nav a:hover::before{background:#fff;}
+.intern-nav a:hover b{background:rgba(255,255,255,.25);color:#fff;}
+
+/* هر حوزه */
+.intern-section{scroll-margin-top:90px;}
+.intern-section__head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding:11px 18px;margin-bottom:26px;border-radius:14px;
+  background:color-mix(in srgb,var(--ac) 7%,#fff);
+  border:1px solid color-mix(in srgb,var(--ac) 16%,transparent);
+  border-right:4px solid var(--ac);
+}
+.intern-section__head h3{margin:0;font-size:15.5px;font-weight:800;color:var(--ink);}
+.intern-section__meta{font-size:12px;color:#6f7f8d;display:flex;align-items:center;gap:6px;}
+.intern-section__meta b{color:var(--ac);}
+.intern-section__meta i{width:3px;height:3px;border-radius:50%;background:#b7c2cc;display:inline-block;margin:0 4px;}
+.intern-section__grid{flex:none;}
+.intern-section .team-empty{padding:22px 20px;font-size:12.5px;border-radius:14px;border-color:color-mix(in srgb,var(--ac) 30%,transparent);}
+
+@media (max-width:720px){
+  .intern-sections{flex-basis:100%;}
+  .intern-nav{justify-content:center;}
+}
